@@ -1,0 +1,212 @@
+// =======================
+// CLASSE INFRAÇÃO
+// =======================
+
+class Infracao {
+    constructor(nome, descricao, pena, extra = null) {
+        this.nome = nome;
+        this.descricao = descricao;
+        this.pena = pena;
+        this.extra = extra;
+    }
+}
+
+// =======================
+// CLASSE PROCESSO
+// =======================
+
+class ProcessoDisciplinar {
+
+    constructor() {
+        this.infracoesSelecionadas = [];
+        this.agravantes = [];
+    }
+
+    adicionarInfracao(infracao) {
+        this.infracoesSelecionadas.push(infracao);
+    }
+
+    adicionarAgravante(valor) {
+        this.agravantes.push(valor);
+    }
+
+    calcularPena() {
+
+        let verbais = 0;
+        let adv1 = 0;
+        let adv2 = 0;
+        let exoneracaoDireta = false;
+
+        this.infracoesSelecionadas.forEach(inf => {
+
+            if (inf.pena === "Advertência verbal") verbais++;
+            else if (inf.pena === "ADV I") adv1++;
+            else if (inf.pena === "ADV II") adv2++;
+            else if (inf.pena && inf.pena.includes("Exoneração")) exoneracaoDireta = true;
+
+        });
+
+        let penaFinal = "";
+
+        // MATRIZ ORIGINAL INTACTA
+
+        if(exoneracaoDireta){
+            penaFinal="Exoneração imediata";
+        }
+        else if(adv1>=1 && adv2>=1){
+            penaFinal="Exoneração";
+        }
+        else if(adv2>=1 && (verbais>=1 || adv1>=1 || adv2>1)){
+            penaFinal="ADV III + Exoneração";
+        }
+        else if(adv1>=3){
+            penaFinal="ADV III + Exoneração";
+        }
+        else if(adv1==2){
+            penaFinal="ADV II";
+        }
+        else if(verbais>=4){
+            penaFinal="ADV III + Exoneração";
+        }
+        else if(verbais==3){
+            penaFinal="ADV II";
+        }
+        else if(verbais==2){
+            penaFinal="ADV I";
+        }
+        else if(verbais>=1 && adv1>=1){
+            penaFinal="ADV II";
+        }
+        else if(verbais==1){
+            penaFinal="Advertência verbal";
+        }
+        else if(adv1==1){
+            penaFinal="ADV I";
+        }
+        else if(adv2==1){
+            penaFinal="ADV II";
+        }
+
+        // AGRAVANTES
+
+        this.agravantes.forEach(a => {
+
+            if(a=="1"){
+                if(penaFinal=="Advertência verbal") penaFinal="ADV I";
+                else if(penaFinal=="ADV I") penaFinal="ADV II";
+                else if(penaFinal=="ADV II") penaFinal="ADV III + Exoneração";
+            }
+
+            if(a=="2"){
+                if(penaFinal=="Advertência verbal") penaFinal="ADV II";
+                else if(penaFinal=="ADV I") penaFinal="ADV III + Exoneração";
+                else if(penaFinal=="ADV II") penaFinal="ADV III + Exoneração";
+            }
+
+            if(a=="3"){
+                penaFinal="ADV III + Exoneração";
+            }
+
+        });
+
+        return penaFinal;
+    }
+
+    gerarExtras(penaFinal) {
+        if(penaFinal === "ADV III + Exoneração" || penaFinal === "Exoneração imediata")
+            return [];
+
+        return this.infracoesSelecionadas
+            .filter(i => i.extra)
+            .map(i => i.extra);
+    }
+}
+
+// =======================
+// CLASSE APP
+// =======================
+
+class CorregedoriaApp {
+
+    constructor(dados) {
+        this.dados = dados;
+        this.carregar();
+    }
+
+    carregar() {
+        let container = document.getElementById("infraçõesContainer");
+
+        for(let categoria in this.dados){
+
+            let div = document.createElement("div");
+            div.className="secao";
+            div.innerHTML=`<h2>${categoria}</h2>`;
+
+            this.dados[categoria].forEach(item=>{
+
+                let infracao = new Infracao(item[0], item[1], item[2], item[3]);
+
+                div.innerHTML+=`
+                <label title="${infracao.descricao}">
+                <input type="checkbox"
+                data-nome="${infracao.nome}"
+                data-pena="${infracao.pena}"
+                data-extra="${infracao.extra}"
+                onchange="app.atualizar()">
+                ${infracao.nome}
+                </label>`;
+
+            });
+
+            container.appendChild(div);
+        }
+    }
+
+    atualizar(){
+
+        let processo = new ProcessoDisciplinar();
+
+        document.querySelectorAll("input[type=checkbox]:checked").forEach(cb=>{
+            let inf = new Infracao(
+                cb.dataset.nome,
+                "",
+                cb.dataset.pena,
+                cb.dataset.extra
+            );
+            processo.adicionarInfracao(inf);
+        });
+
+        document.querySelectorAll(".agravante:checked").forEach(a=>{
+            processo.adicionarAgravante(a.value);
+        });
+
+        let penaFinal = processo.calcularPena();
+        let extras = processo.gerarExtras(penaFinal);
+
+        let infraTexto = processo.infracoesSelecionadas
+            .map(i => `• ${i.nome}`)
+            .join("<br>");
+
+        let extrasTexto = extras.map(e => `• ${e}`).join("<br>");
+
+        document.getElementById("textoProcesso").innerHTML = `
+        <strong>Punição Final:</strong><br>
+        • ${penaFinal}<br><br>
+        ${extrasTexto}
+        `;
+    }
+}
+
+// =======================
+// DADOS (INALTERADOS)
+// =======================
+
+const dados = {};
+
+// =======================
+// INICIAR APP
+// =======================
+
+window.addEventListener('DOMContentLoaded', () => {
+    window.app = new CorregedoriaApp(dados);
+});
